@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Download Status</title>
+    <script>
+      async function pollStatus() {
+        const res = await fetch(`/status/{{ file_id }}`);
+        const json = await res.json();
+        const statusEl = document.getElementById("status-text");
+
+        if (json.status === "done") {
+          window.location.reload();
+        } else if (json.status === "error") {
+          statusEl.innerText = "❌ Fehler beim Download.";
+        } else {
+          statusEl.innerText = "⏳ Wird heruntergeladen...";
+          setTimeout(pollStatus, 2000);
+        }
+      }
+
+      {% if status != "done" and status != "error" %}
+      window.onload = pollStatus;
+      {% endif %}
+
+      async function loadMetadata(fileId, filename, containerId) {
+        try {
+          const res = await fetch(`/meta/${fileId}/${filename}`);
+          const meta = await res.json();
+          if (!meta.error) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+              <div class="flex gap-4 items-start mt-4">
+                ${meta.cover ? `<img src="data:${meta.cover_mime};base64,${meta.cover}" alt="Cover" class="w-20 h-20 rounded shadow" />` : ""}
+                <div class="flex-1">
+                  <div class="text-base font-semibold text-gray-900">${meta.title}</div>
+                  <div class="text-sm text-gray-700">${meta.artist} &middot; <span class="italic">${meta.album}</span></div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    ⏱️ ${meta.duration}s &nbsp;&bull;&nbsp;
+                    🎧 ${Math.round(meta.bitrate / 1000)} kbps &nbsp;&bull;&nbsp;
+                    📀 Track ${meta.tracknumber || "?"} &nbsp;&bull;&nbsp;
+                    ${meta.date || "?"}
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">
+                    ISRC: ${meta.isrc || "-"}<br>
+                    ${meta.copyright || ""}
+                  </div>
+                </div>
+              </div>`;
+          }
+        } catch (e) {
+          console.error("Fehler beim Laden der Metadaten:", e);
+        }
+      }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-white text-neutral-900 font-sans">
+    <div class="max-w-2xl mx-auto py-10 px-4">
+      <h1 class="text-2xl font-semibold mb-4">Download-Status</h1>
+      <div class="bg-gray-100 p-4 rounded-xl shadow">
+        <p class="text-sm text-gray-600 mb-2">
+          Vorgang-ID:
+          <span class="font-mono text-gray-800">{{ file_id }}</span>
+        </p>
+        <p id="status-text" class="text-lg font-medium">
+          {% if status == "done" %} ✅ Fertig! Hier sind deine Dateien: {% elif status == "error" %} ❌ Fehler beim Download. {% else %} ⏳ Wird heruntergeladen... {% endif %}
+        </p>
+      </div>
+
+      {% if files %}
+      <div class="mt-6">
+        <h2 class="text-lg font-semibold mb-2">Einzeldownloads</h2>
+        <div class="my-2">
+          <a
+            href="/zip/{{ file_id }}"
+            class="inline-block bg-black text-white px-4 py-2 rounded-xl text-sm hover:bg-neutral-800 transition"
+          >
+            ⬇️ Alle als ZIP herunterladen
+          </a>
+        </div>
+        <ul class="space-y-6">
+          {% for file in files %}
+          <li class="bg-neutral-50 rounded-lg px-4 py-4 hover:bg-neutral-100 transition shadow-sm border border-neutral-200">
+            <a
+              href="/file/{{ file.id }}/{{ file.rel_path }}"
+              class="text-blue-600 hover:underline font-medium block truncate"
+            >
+              {{ file.name }}
+            </a>
+            <span class="text-sm text-gray-500">{{ file.size }}</span>
+            <div id="meta-{{ loop.index }}"></div>
+            <script>
+              loadMetadata("{{ file.id }}", "{{ file.rel_path }}", "meta-{{ loop.index }}");
+            </script>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+</html>
