@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Ergebnisse für „{{ query }}“</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background: linear-gradient(270deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
+        background-size: 800% 800%;
+        animation: gradient 30s ease infinite;
+      }
+      @keyframes gradient {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      /* kleine Pop-Animation */
+      .selected {
+        animation: pop 0.2s ease forwards;
+      }
+      @keyframes pop {
+        0%   { transform: scale(1); }
+        50%  { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen p-6 font-sans text-white">
+    <div class="max-w-3xl mx-auto space-y-6">
+      <h1 class="text-4xl font-bold text-center">Ergebnisse für „{{ query }}“</h1>
+
+      <!-- Bulk-Download-Formular -->
+      <form action="/start_bulk" method="post" class="space-y-4">
+        <input type="hidden" name="query" value="{{ query }}"/>
+        <!-- Hier werden die versteckten Inputs für jede ausgewählte URL eingefügt -->
+        <div id="selected-inputs"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {% for song in songs %}
+          <div
+            class="bg-white bg-opacity-20 backdrop-blur-xl border border-white border-opacity-20 
+                   rounded-2xl shadow-lg p-4 flex gap-4 items-center cursor-pointer 
+                   transition duration-200 ease-in-out hover:bg-opacity-30"
+            data-url="{{ song.url }}"
+            onclick="toggleTile(this)"
+          >
+            {% if song.cover_url %}
+            <img src="{{ song.cover_url }}" alt="Cover" class="h-16 w-16 rounded-lg shadow-md"/>
+            {% else %}
+            <div class="h-16 w-16 rounded-lg bg-gray-300 bg-opacity-20"></div>
+            {% endif %}
+
+            <div class="flex-1 space-y-1">
+              <div class="flex items-center justify-between">
+                <div class="text-lg font-semibold">{{ song.name }}</div>
+                {% if song.explicit %}
+                <span class="text-xs uppercase px-1 py-0.5 bg-red-600 rounded text-white font-bold">Explicit</span>
+                {% endif %}
+              </div>
+              <div class="text-sm italic">
+                {{ song.artists | join(', ') }}
+                {% if song.album_name %} &middot; <span class="font-medium">{{ song.album_name }}</span>{% endif %}
+              </div>
+              <div class="text-sm">
+                Dauer: {{ song.duration }}s &bull; Popularität: {{ song.popularity }}%
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="flex justify-between mt-6">
+          <a href="/" 
+             class="px-4 py-2 rounded-full bg-white bg-opacity-20 backdrop-blur-md 
+                    border border-white border-opacity-40 text-white font-medium 
+                    transition hover:bg-opacity-35">
+            ← Zurück
+          </a>
+          <button type="submit" 
+                  class="px-6 py-2 rounded-full bg-white bg-opacity-25 backdrop-blur-md 
+                         border border-white border-opacity-40 text-white font-semibold 
+                         transition hover:bg-opacity-40">
+            Ausgewählte herunterladen
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <script>
+      const selectedInputs = document.getElementById('selected-inputs');
+
+      function toggleTile(tile) {
+        const url = tile.dataset.url;
+        if (tile.classList.contains('ring-4')) {
+          // abwählen
+          tile.classList.remove('ring-4','ring-indigo-400','selected');
+          const inp = selectedInputs.querySelector(`input[value="${url}"]`);
+          if (inp) selectedInputs.removeChild(inp);
+        } else {
+          // auswählen
+          tile.classList.add('ring-4','ring-indigo-400','selected');
+          const hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = 'song_urls';
+          hidden.value = url;
+          selectedInputs.appendChild(hidden);
+        }
+      }
+    </script>
+  </body>
+</html>

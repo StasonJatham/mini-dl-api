@@ -2,102 +2,173 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <title>Download Status</title>
-    <script>
-      async function pollStatus() {
-        const res = await fetch(`/status/{{ file_id }}`);
-        const json = await res.json();
-        const statusEl = document.getElementById("status-text");
-
-        if (json.status === "done") {
-          window.location.reload();
-        } else if (json.status === "error") {
-          statusEl.innerText = "❌ Fehler beim Download.";
-        } else {
-          statusEl.innerText = "⏳ Wird heruntergeladen...";
-          setTimeout(pollStatus, 2000);
-        }
-      }
-
-      {% if status != "done" and status != "error" %}
-      window.onload = pollStatus;
-      {% endif %}
-
-      async function loadMetadata(fileId, filename, containerId) {
-        try {
-          const res = await fetch(`/meta/${fileId}/${filename}`);
-          const meta = await res.json();
-          if (!meta.error) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = `
-              <div class="flex gap-4 items-start mt-4">
-                ${meta.cover ? `<img src="data:${meta.cover_mime};base64,${meta.cover}" alt="Cover" class="w-20 h-20 rounded shadow" />` : ""}
-                <div class="flex-1">
-                  <div class="text-base font-semibold text-gray-900">${meta.title}</div>
-                  <div class="text-sm text-gray-700">${meta.artist} &middot; <span class="italic">${meta.album}</span></div>
-                  <div class="text-xs text-gray-500 mt-1">
-                    ⏱️ ${meta.duration}s &nbsp;&bull;&nbsp;
-                    🎧 ${Math.round(meta.bitrate / 1000)} kbps &nbsp;&bull;&nbsp;
-                    📀 Track ${meta.tracknumber || "?"} &nbsp;&bull;&nbsp;
-                    ${meta.date || "?"}
-                  </div>
-                  <div class="text-xs text-gray-400 mt-1">
-                    ISRC: ${meta.isrc || "-"}<br>
-                    ${meta.copyright || ""}
-                  </div>
-                </div>
-              </div>`;
-          }
-        } catch (e) {
-          console.error("Fehler beim Laden der Metadaten:", e);
-        }
-      }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Download-Status</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background: linear-gradient(270deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
+        background-size: 800% 800%;
+        animation: gradient 30s ease infinite;
+      }
+      @keyframes gradient {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 9999px;
+        width: 32px;
+        height: 32px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+        margin-bottom: 1rem;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
-  <body class="bg-white text-neutral-900 font-sans">
-    <div class="max-w-2xl mx-auto py-10 px-4">
-      <h1 class="text-2xl font-semibold mb-4">Download-Status</h1>
-      <div class="bg-gray-100 p-4 rounded-xl shadow">
-        <p class="text-sm text-gray-600 mb-2">
-          Vorgang-ID:
-          <span class="font-mono text-gray-800">{{ file_id }}</span>
-        </p>
-        <p id="status-text" class="text-lg font-medium">
-          {% if status == "done" %} ✅ Fertig! Hier sind deine Dateien: {% elif status == "error" %} ❌ Fehler beim Download. {% else %} ⏳ Wird heruntergeladen... {% endif %}
-        </p>
+  <body class="min-h-screen font-sans text-white">
+    <div class="max-w-3xl mx-auto p-6">
+      <h1 class="text-3xl font-bold text-center mb-4">Download-Status</h1>
+
+      <div id="spinner" class="spinner"></div>
+      <p class="text-center text-lg mb-4" id="message">Lade herunter...</p>
+
+      <div class="text-center mt-4">
+        <a
+          id="bulk-download"
+          href="#"
+          class="px-4 py-2 bg-white bg-opacity-25 text-white rounded-full border border-white hover:bg-opacity-40 transition"
+        >
+          Alle als ZIP herunterladen
+        </a>
       </div>
 
-      {% if files %}
-      <div class="mt-6">
-        <h2 class="text-lg font-semibold mb-2">Einzeldownloads</h2>
-        <div class="my-2">
-          <a
-            href="/zip/{{ file_id }}"
-            class="inline-block bg-black text-white px-4 py-2 rounded-xl text-sm hover:bg-neutral-800 transition"
-          >
-            ⬇️ Alle als ZIP herunterladen
-          </a>
-        </div>
-        <ul class="space-y-6">
-          {% for file in files %}
-          <li class="bg-neutral-50 rounded-lg px-4 py-4 hover:bg-neutral-100 transition shadow-sm border border-neutral-200">
-            <a
-              href="/file/{{ file.id }}/{{ file.rel_path }}"
-              class="text-blue-600 hover:underline font-medium block truncate"
-            >
-              {{ file.name }}
-            </a>
-            <span class="text-sm text-gray-500">{{ file.size }}</span>
-            <div id="meta-{{ loop.index }}"></div>
-            <script>
-              loadMetadata("{{ file.id }}", "{{ file.rel_path }}", "meta-{{ loop.index }}");
-            </script>
-          </li>
-          {% endfor %}
-        </ul>
+      <div id="file-list" class="mt-8 space-y-4"></div>
+
+      <div class="mt-10 text-center">
+        <a href="/" class="text-white underline hover:text-gray-200"
+          >← Zurück zur Suche</a
+        >
       </div>
-      {% endif %}
+
+      <div class="mt-4 text-center">
+        <button
+          onclick="refreshCookie()"
+          class="px-6 py-2 rounded-full bg-white bg-opacity-20 border border-white hover:bg-opacity-30 transition text-white font-medium"
+        >
+          Historie Löschen
+        </button>
+      </div>
     </div>
+
+  <script>
+  const clientId = "{{ client_id }}";
+  const msg = document.getElementById("message");
+  const list = document.getElementById("file-list");
+  const zipLink = document.getElementById("bulk-download");
+  const spinner = document.getElementById("spinner");
+
+  zipLink.href = `/zip/${clientId}`;
+
+  let timeoutSeconds = null;
+  let timeoutStart = null;
+
+  function refreshCookie() {
+    fetch("/refresh_cookie")
+      .then(() => {
+        window.location.href = "/";
+      })
+      .catch((err) => {
+        console.error("Fehler beim Refresh:", err);
+        alert("❌ Cookie konnte nicht aktualisiert werden.");
+      });
+  }
+
+  function formatMessage(raw) {
+    if (!raw) return "";
+
+    const clean = raw.replace(/^(INFO|WARNING):.*?:\s*/, '');
+
+    const retryMatch = clean.match(/Retry will occur after: (\d+)/);
+    if (retryMatch) {
+      const seconds = parseInt(retryMatch[1], 10);
+      if (!timeoutStart || timeoutSeconds !== seconds) {
+        timeoutStart = Date.now();
+        timeoutSeconds = seconds;
+      }
+      const elapsed = Math.floor((Date.now() - timeoutStart) / 1000);
+      const remaining = Math.max(0, timeoutSeconds - elapsed);
+      return `Warte auf Freigabe (${remaining} Sekunden)…`;
+    }
+
+    const downloaded = clean.match(/Downloaded "(.*?)"/);
+    if (downloaded) {
+      return `Fertig: ${downloaded[1]}`;
+    }
+
+    return clean;
+  }
+
+  async function pollStatus() {
+    try {
+      const res = await fetch(`/api/status/${clientId}`);
+      if (!res.ok) throw new Error("Verzeichnis nicht gefunden.");
+      const json = await res.json();
+
+      msg.innerText = formatMessage(json.message || "Wird heruntergeladen...");
+      spinner.style.display =
+        json.status === "done" || json.status === "idle" ? "none" : "block";
+
+      // Liste aktualisieren
+      list.innerHTML = "";
+      for (const f of json.files || []) {
+        const el = document.createElement("div");
+        el.className =
+          "bg-white bg-opacity-20 backdrop-blur-xl rounded-lg p-4 shadow flex items-center gap-4";
+
+        el.innerHTML = `
+          ${
+            f.cover
+              ? `<img src="data:${f.cover_mime};base64,${f.cover}" class="w-16 h-16 rounded shadow" />`
+              : ""
+          }
+          <div class="flex-1">
+            <div class="font-semibold text-lg">${f.filename}</div>
+            <div class="text-sm text-white/90">
+              Dauer: ${f.duration}s · Bitrate: ${Math.round(
+                f.bitrate / 1000
+              )} kbps · Filesize: ${(f.filesize / (1024 * 1024)).toFixed(2)} MB
+            </div>
+            <a href="/file/${clientId}/${encodeURIComponent(f.filename)}" 
+               class="text-sm text-white underline hover:text-gray-200 mt-1 inline-block">Herunterladen</a>
+          </div>
+        `;
+        list.appendChild(el);
+      }
+    } catch (err) {
+      console.error("Fehler beim Statusabruf:", err);
+      msg.innerText = "❌ Fehler beim Abrufen des Status.";
+      spinner.style.display = "none";
+    }
+  }
+
+  setInterval(pollStatus, 1000);  // für Countdown präziser jede Sekunde
+  pollStatus();
+</script>
   </body>
 </html>

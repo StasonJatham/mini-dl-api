@@ -2,32 +2,142 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Musik Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Slow moving gradient background */
+      body {
+        background: linear-gradient(270deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
+        background-size: 800% 800%;
+        animation: gradient 30s ease infinite;
+      }
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      /* Glass-style Suggestion Dropdown */
+      .suggestions {
+        position: absolute;
+        top: calc(100% + 0.25rem);
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border-radius: 0.5rem;
+        max-height: 20rem;
+        overflow-y: auto;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+      .suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        cursor: pointer;
+      }
+      .suggestion-item:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .suggestion-item img {
+        width: 3rem;
+        height: 3rem;
+        object-fit: cover;
+        border-radius: 0.375rem;
+      }
+      .suggestion-info {
+        flex: 1;
+      }
+      .suggestion-info .title {
+        font-weight: 600;
+        color: #1f2937;
+      }
+      .suggestion-info .meta {
+        font-size: 0.875rem;
+        color: #4b5563;
+      }
+    </style>
   </head>
-  <body class="bg-white text-neutral-900 font-sans min-h-screen flex items-center justify-center">
-    <div class="w-full max-w-md px-6">
-      <h1 class="text-2xl font-semibold text-center mb-6">🎵 Musik herunterladen</h1>
-      <p class="text-center text-sm text-gray-500 mb-6">
-        Gib einen <strong>Spotify-Link</strong> oder <strong>Songtitel</strong> ein.
-        <br />
-        Beispiele: <em>https://open.spotify.com/track/…</em> oder <em>Blur - Song 2</em>
-      </p>
-      <form action="/start" method="post" class="bg-gray-50 p-6 rounded-xl shadow space-y-4">
-        <input
-          type="text"
-          name="query"
-          placeholder="Spotify-Link oder Suchbegriff"
-          required
-          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-        />
-        <button
-          type="submit"
-          class="w-full bg-black text-white py-2 rounded-md hover:bg-neutral-800 transition"
-        >
-          ⬇️ Download starten
-        </button>
+  <body class="min-h-screen flex items-center justify-center font-sans text-white">
+    <div class="w-full max-w-xl px-4">
+      <form action="/results" method="get" class="w-full space-y-6">
+        <!-- Eingabebereich mit eigenem relativen Container -->
+        <div class="relative">
+          <input
+            type="text"
+            name="query"
+            id="query-input"
+            placeholder="Gib Spotify-Link oder Songtitel ein"
+            required
+            class="w-full border-b-2 border-white bg-transparent pb-2 text-center text-2xl placeholder-gray-500 focus:outline-none focus:border-b-4 transition"
+            autocomplete="off"
+          />
+          <div id="suggestions" class="suggestions hidden"></div>
+        </div>
+        <!-- Submit Button -->
+        <div class="flex justify-center">
+          <button
+            type="submit"
+            class="px-8 py-3 rounded-full border border-white bg-white bg-opacity-20 hover:bg-opacity-40 transition font-medium"
+          >
+            Suchen
+          </button>
+        </div>
       </form>
     </div>
+    <script>
+      const input = document.getElementById('query-input');
+      const suggestionsBox = document.getElementById('suggestions');
+      let controller;
+
+      input.addEventListener('input', async () => {
+        const val = input.value.trim();
+        if (val.length < 2) {
+          suggestionsBox.classList.add('hidden');
+          return;
+        }
+        if (controller) controller.abort();
+        controller = new AbortController();
+        let items = [];
+        try {
+          const res = await fetch('/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: val, limit: 5 }),
+            signal: controller.signal
+          });
+          items = await res.json();
+        } catch {
+          items = [];
+        }
+        suggestionsBox.innerHTML = items.length
+          ? items.map(it => `
+            <div class="suggestion-item" data-file="${it.filename}">
+              ${it.cover ? `<img src="data:${it.cover_mime};base64,${it.cover}" alt="Cover"/>` : ''}
+              <div class="suggestion-info">
+                <div class="title">${it.filename}</div>
+                <div class="meta">Dauer: ${it.duration}s • ${Math.round(it.bitrate/1000)} kbps</div>
+              </div>
+            </div>
+          `).join("")
+          : `<div class="px-4 py-2 text-gray-200">Keine lokalen Treffer. Formular absenden zum Download.</div>`;
+        suggestionsBox.classList.remove('hidden');
+      });
+
+      suggestionsBox.addEventListener('click', e => {
+        const item = e.target.closest('.suggestion-item');
+        if (!item) return;
+        const fname = item.getAttribute('data-file');
+        window.location.href = `/file_local/${encodeURIComponent(fname)}`;
+      });
+
+      document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !suggestionsBox.contains(e.target)) {
+          suggestionsBox.classList.add('hidden');
+        }
+      });
+    </script>
   </body>
 </html>
