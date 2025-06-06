@@ -34,10 +34,11 @@ import base64
 SPOTDL_BASE = os.getenv("SPOTDL_BASE", "http://127.0.0.1:8800")
 DOWNLOAD_DIR = Path("./downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
-DEFAULT_COOKIE_EXPIRATION = 60 * 60 * 24 * 7
+DEFAULT_COOKIE_EXPIRATION = 60 * 60 # 1 hour
+SPOTDL_EXEC="/root/ytloader/mini-dl-api/venv/bin/spotdl"
 
 # === Local file search index ===
-file_index: List[str] = []
+file_index: List[dict] = []
 download_status = {}
 
 
@@ -62,13 +63,20 @@ class SearchResult(BaseModel):
     cover_mime: Optional[str]
 
 
-@app.on_event("startup")
-async def build_file_index():
+async def build_file_index_helper():
+    file_index.clear()
     for root, _, files in os.walk(DOWNLOAD_DIR):
         for f in files:
-            rel = os.path.relpath(os.path.join(root, f), DOWNLOAD_DIR)
-            file_index.append(rel)
+            abs_path = os.path.join(root, f)
+            rel = os.path.relpath(abs_path, DOWNLOAD_DIR)
+            file_index.append({
+                "original": rel,
+                "lower": rel.lower()
+            })
 
+@app.on_event("startup")
+async def build_file_index():
+    await build_file_index_helper()
 
 def extract_metadata(path: Path) -> dict:
     audio = MP3(path, ID3=EasyID3)
@@ -87,20 +95,26 @@ def extract_metadata(path: Path) -> dict:
 
 @app.post("/search", response_model=List[SearchResult])
 async def search_files(request: SearchRequest):
+    query = request.query.lower()
+    lower_index = [entry["lower"] for entry in file_index]
+
     matches = process.extract(
-        request.query,
-        file_index,
+        query,
+        lower_index,
         scorer=fuzz.WRatio,
         limit=request.limit * 2,
     )
     seen: Set[str] = set()
     results: List[SearchResult] = []
 
-    for rel_path, score, _ in matches:
+    for matched_lower, score, index in matches:
+        entry = file_index[index]
+        rel_path = entry["original"]
         name = Path(rel_path).name
+
         if score < 50 or name in seen:
             continue
-        seen.add(name)
+        seen.add(name.lower())
         meta = extract_metadata(DOWNLOAD_DIR / rel_path)
         results.append(
             SearchResult(
@@ -124,28 +138,19 @@ async def search_files(request: SearchRequest):
 # === Landing page ===
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, client_id: Optional[str] = Cookie(None)):
-    if not client_id:
-        client_id = str(uuid.uuid4())
-        response = templates.TemplateResponse("index.html", {"request": request})
+    client_id = str(uuid.uuid4())
+    response = templates.TemplateResponse("index.html", {"request": request})
+    response.set_cookie(
+        "client_id",
+        client_id,
+        httponly=True,
+        max_age=DEFAULT_COOKIE_EXPIRATION
+    )
+    return response
 
-        response.set_cookie(
-            "client_id",
-            client_id,
-            httponly=True,
-            max_age=DEFAULT_COOKIE_EXPIRATION
-        )
-        return response
-    else:
-        response = templates.TemplateResponse("index.html", {"request": request})
-        response.set_cookie(
-            "client_id",
-            client_id,
-            httponly=True,
-            max_age=DEFAULT_COOKIE_EXPIRATION
-        )
-        return templates.TemplateResponse("index.html", {"request": request})
-
-
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+  
 @app.get("/refresh_cookie")
 async def refresh_cookie():
     new_id = str(uuid.uuid4())
@@ -216,7 +221,7 @@ async def run_spotdl(query: str, file_id: str):
     client_path.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "spotdl",
+        SPOTDL_EXEC,
         "download",
         query,
         "--output",
@@ -255,7 +260,7 @@ async def run_spotdl(query: str, file_id: str):
     status = "done" if rc == 0 else "error"
     download_status[file_id]["status"] = status
     download_status[file_id]["message"] = "Fertig" if status == "done" else "Fehler"
-
+    await build_file_index_helper()
 
 # === Helper ===
 
@@ -341,8 +346,8 @@ async def download_zip(file_id: str):
 @app.get("/file_local/{filename}")
 async def download_local(filename: str):
     for rel in file_index:
-        if Path(rel).name == filename:
-            fpath = DOWNLOAD_DIR / rel
+        if Path(rel["original"]).name == filename:
+            fpath = DOWNLOAD_DIR / rel["original"]
             if fpath.exists():
                 return FileResponse(fpath, filename=filename, media_type="audio/mpeg")
     raise HTTPException(404, "Datei nicht gefunden")
@@ -397,7 +402,7 @@ async def run_spotdl_cli(url: str, client_id: str):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "spotdl",
+        SPOTDL_EXEC,
         "download",
         url,
         "--output",
@@ -427,6 +432,7 @@ async def run_spotdl_cli(url: str, client_id: str):
 
     await process.wait()
     download_status[client_id]["status"] = "done"
+    await build_file_index_helper()
     download_status[client_id]["message"] = "Fertig"
 
 
