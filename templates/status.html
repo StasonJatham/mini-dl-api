@@ -47,46 +47,45 @@
       <div id="spinner" class="spinner"></div>
       <p class="text-center text-lg mb-4" id="message">Lade herunter...</p>
 
+      <!-- Session Controls -->
+      <div
+        class="flex flex-col md:flex-row justify-center items-center gap-4 mb-8"
+      >
+        <!-- Dropdown -->
+        <div class="relative w-full max-w-xs">
+          <select
+            id="clientIdDropdown"
+            class="w-full appearance-none rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 px-4 py-2 pr-10 text-sm shadow-lg focus:outline-none focus:ring-2 focus:ring-white/30 transition"
+          >
+            <option disabled selected>🔍 Verlauf auswählen…</option>
+          </select>
+          <div
+            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white"
+          >
+            <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+              <path d="M7 7l3-3 3 3m0 6l-3 3-3-3" />
+            </svg>
+          </div>
+        </div>
 
+        <!-- Button: ZIP Download -->
+        <a
+          id="bulk-download"
+          href="#"
+          class="px-4 py-2 bg-white bg-opacity-25 text-white rounded-full border border-white hover:bg-opacity-40 transition text-sm shadow"
+        >
+          ZIP herunterladen
+        </a>
 
-
-
-<!-- Session Controls -->
-<div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
-
-  <!-- Dropdown -->
-  <div class="relative w-full max-w-xs">
-    <select
-      id="clientIdDropdown"
-      class="w-full appearance-none rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 px-4 py-2 pr-10 text-sm shadow-lg focus:outline-none focus:ring-2 focus:ring-white/30 transition"
-    >
-      <option disabled selected>🔍 Verlauf auswählen…</option>
-    </select>
-    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
-      <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
-        <path d="M7 7l3-3 3 3m0 6l-3 3-3-3" />
-      </svg>
-    </div>
-  </div>
-
-  <!-- Button: ZIP Download -->
-  <a
-    id="bulk-download"
-    href="#"
-    class="px-4 py-2 bg-white bg-opacity-25 text-white rounded-full border border-white hover:bg-opacity-40 transition text-sm shadow"
-  >
-    ZIP herunterladen
-  </a>
-
-  <!-- Button: Historie löschen -->
-  <button
-    onclick="refreshCookie()"
-    class="px-4 py-2 rounded-full bg-white bg-opacity-20 border border-white hover:bg-opacity-30 transition text-white text-sm shadow"
-  >
-    Historie löschen
-  </button>
-</div>
-<!-- End Session Controls -->
+        <!-- Button: Historie löschen -->
+        <button
+          onclick="refreshCookie()"
+          class="px-4 py-2 rounded-full bg-white bg-opacity-20 border border-white hover:bg-opacity-30 transition text-white text-sm shadow"
+        >
+          Historie löschen
+        </button>
+      </div>
+      <!-- End Session Controls -->
 
       <div id="file-list" class="mt-8 space-y-4"></div>
 
@@ -95,76 +94,76 @@
           >← Zurück zur Suche</a
         >
       </div>
-
-  
     </div>
 
-  <script>
-  const clientId = "{{ client_id }}";
-  const msg = document.getElementById("message");
-  const list = document.getElementById("file-list");
-  const zipLink = document.getElementById("bulk-download");
-  const spinner = document.getElementById("spinner");
-  storeClientIdInHistory(clientId);
-  zipLink.href = `/zip/${clientId}`;
+    <script>
+      const clientId = "{{ client_id }}";
+      const msg = document.getElementById("message");
+      const list = document.getElementById("file-list");
+      const zipLink = document.getElementById("bulk-download");
+      const spinner = document.getElementById("spinner");
+      storeClientIdInHistory(clientId);
+      zipLink.href = `/zip/${clientId}`;
 
-  let timeoutSeconds = null;
-  let timeoutStart = null;
+      let timeoutSeconds = null;
+      let timeoutStart = null;
 
-  function refreshCookie() {
-    fetch("/refresh_cookie")
-      .then(() => {
-        window.location.href = "/";
-      })
-      .catch((err) => {
-        console.error("Fehler beim Refresh:", err);
-        alert("❌ Cookie konnte nicht aktualisiert werden.");
-      });
-  }
-
-  function formatMessage(raw) {
-    if (!raw) return "";
-
-    const clean = raw.replace(/^(INFO|WARNING):.*?:\s*/, '');
-
-    const retryMatch = clean.match(/Retry will occur after: (\d+)/);
-    if (retryMatch) {
-      const seconds = parseInt(retryMatch[1], 10);
-      if (!timeoutStart || timeoutSeconds !== seconds) {
-        timeoutStart = Date.now();
-        timeoutSeconds = seconds;
+      function refreshCookie() {
+        fetch("/refresh_cookie")
+          .then(() => {
+            window.location.href = "/";
+          })
+          .catch((err) => {
+            console.error("Fehler beim Refresh:", err);
+            alert("❌ Cookie konnte nicht aktualisiert werden.");
+          });
       }
-      const elapsed = Math.floor((Date.now() - timeoutStart) / 1000);
-      const remaining = Math.max(0, timeoutSeconds - elapsed);
-      return `Warte auf Freigabe (${remaining} Sekunden)…`;
-    }
 
-    const downloaded = clean.match(/Downloaded "(.*?)"/);
-    if (downloaded) {
-      return `Fertig: ${downloaded[1]}`;
-    }
+      function formatMessage(raw) {
+        if (!raw) return "";
 
-    return clean;
-  }
+        const clean = raw.replace(/^(INFO|WARNING):.*?:\s*/, "");
 
-  async function pollStatus() {
-    try {
-      const res = await fetch(`/api/status/${clientId}`);
-      if (!res.ok) throw new Error("Verzeichnis nicht gefunden.");
-      const json = await res.json();
+        const retryMatch = clean.match(/Retry will occur after: (\d+)/);
+        if (retryMatch) {
+          const seconds = parseInt(retryMatch[1], 10);
+          if (!timeoutStart || timeoutSeconds !== seconds) {
+            timeoutStart = Date.now();
+            timeoutSeconds = seconds;
+          }
+          const elapsed = Math.floor((Date.now() - timeoutStart) / 1000);
+          const remaining = Math.max(0, timeoutSeconds - elapsed);
+          return `Warte auf Freigabe (${remaining} Sekunden)…`;
+        }
 
-      msg.innerText = formatMessage(json.message || "Wird heruntergeladen...");
-      spinner.style.display =
-        json.status === "done" || json.status === "idle" ? "none" : "block";
+        const downloaded = clean.match(/Downloaded "(.*?)"/);
+        if (downloaded) {
+          return `Fertig: ${downloaded[1]}`;
+        }
 
-      // Liste aktualisieren
-      list.innerHTML = "";
-      for (const f of json.files || []) {
-        const el = document.createElement("div");
-        el.className =
-          "bg-white bg-opacity-20 backdrop-blur-xl rounded-lg p-4 shadow flex items-center gap-4";
+        return clean;
+      }
 
-        el.innerHTML = `
+      async function pollStatus() {
+        try {
+          const res = await fetch(`/api/status/${clientId}`);
+          if (!res.ok) throw new Error("Verzeichnis nicht gefunden.");
+          const json = await res.json();
+
+          msg.innerText = formatMessage(
+            json.message || "Wird heruntergeladen..."
+          );
+          spinner.style.display =
+            json.status === "done" || json.status === "idle" ? "none" : "block";
+
+          // Liste aktualisieren
+          list.innerHTML = "";
+          for (const f of json.files || []) {
+            const el = document.createElement("div");
+            el.className =
+              "bg-white bg-opacity-20 backdrop-blur-xl rounded-lg p-4 shadow flex items-center gap-4";
+
+            el.innerHTML = `
           ${
             f.cover
               ? `<img src="data:${f.cover_mime};base64,${f.cover}" class="w-16 h-16 rounded shadow" />`
@@ -174,81 +173,81 @@
             <div class="font-semibold text-lg">${f.filename}</div>
             <div class="text-sm text-white/90">
               Dauer: ${f.duration}s · Bitrate: ${Math.round(
-                f.bitrate / 1000
-              )} kbps · Filesize: ${(f.filesize / (1024 * 1024)).toFixed(2)} MB
+              f.bitrate / 1000
+            )} kbps · Filesize: ${(f.filesize / (1024 * 1024)).toFixed(2)} MB
             </div>
             <a href="/file/${clientId}/${encodeURIComponent(f.filename)}" 
                class="text-sm text-white underline hover:text-gray-200 mt-1 inline-block">Herunterladen</a>
           </div>
         `;
-        list.appendChild(el);
+            list.appendChild(el);
+          }
+        } catch (err) {
+          console.error("Fehler beim Statusabruf:", err);
+          msg.innerText = "❌ Fehler beim Abrufen des Status.";
+          spinner.style.display = "none";
+        }
       }
-    } catch (err) {
-      console.error("Fehler beim Statusabruf:", err);
-      msg.innerText = "❌ Fehler beim Abrufen des Status.";
-      spinner.style.display = "none";
-    }
-  }
 
-  setInterval(pollStatus, 1000);  // für Countdown präziser jede Sekunde
-  pollStatus();
+      setInterval(pollStatus, 1000); // für Countdown präziser jede Sekunde
+      pollStatus();
 
+      function storeClientIdInHistory(clientId) {
+        const key = "clientIdHistory";
+        let history = [];
 
-function storeClientIdInHistory(clientId) {
-  const key = "clientIdHistory";
-  let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem(key)) || [];
+        } catch {
+          history = [];
+        }
 
-  try {
-    history = JSON.parse(localStorage.getItem(key)) || [];
-  } catch {
-    history = [];
-  }
+        // Neues oben einfügen, Duplikate entfernen
+        history = history.filter((id) => id !== clientId);
+        history.unshift(clientId);
 
-  // Neues oben einfügen, Duplikate entfernen
-  history = history.filter(id => id !== clientId);
-  history.unshift(clientId);
+        // Maximal 20 Einträge
+        if (history.length > 20) {
+          history = history.slice(0, 20);
+        }
 
-  // Maximal 20 Einträge
-  if (history.length > 20) {
-    history = history.slice(0, 20);
-  }
+        localStorage.setItem(key, JSON.stringify(history));
+      }
 
-  localStorage.setItem(key, JSON.stringify(history));
-}
+      function populateClientIdDropdown() {
+        const select = document.getElementById("clientIdDropdown");
+        if (!select) return;
 
-function populateClientIdDropdown() {
-  const select = document.getElementById("clientIdDropdown");
-  if (!select) return;
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem("clientIdHistory")) || [];
+        } catch {
+          history = [];
+        }
 
-  let history = [];
-  try {
-    history = JSON.parse(localStorage.getItem("clientIdHistory")) || [];
-  } catch {
-    history = [];
-  }
+        // Dropdown leeren
+        select.innerHTML =
+          "<option disabled selected>Verlauf auswählen…</option>";
 
-  // Dropdown leeren
-  select.innerHTML = '<option disabled selected>Verlauf auswählen…</option>';
+        history.forEach((clientId) => {
+          const option = document.createElement("option");
+          option.value = clientId;
+          option.textContent = clientId;
+          select.appendChild(option);
+        });
 
-  history.forEach(clientId => {
-    const option = document.createElement("option");
-    option.value = clientId;
-    option.textContent = clientId;
-    select.appendChild(option);
-  });
+        select.addEventListener("change", () => {
+          const selected = select.value;
+          if (selected) {
+            window.location.href = `/status_page/${selected}`;
+          }
+        });
+      }
 
-  select.addEventListener("change", () => {
-    const selected = select.value;
-    if (selected) {
-      window.location.href = `/status_page/${selected}`;
-    }
-  });
-}
-
-// Initialisieren bei Seitenladeende
-document.addEventListener("DOMContentLoaded", () => {
-  populateClientIdDropdown();
-});
-</script>
+      // Initialisieren bei Seitenladeende
+      document.addEventListener("DOMContentLoaded", () => {
+        populateClientIdDropdown();
+      });
+    </script>
   </body>
 </html>
