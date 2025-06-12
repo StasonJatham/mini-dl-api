@@ -44,19 +44,49 @@
   <body class="min-h-screen font-sans text-white">
     <div class="max-w-3xl mx-auto p-6">
       <h1 class="text-3xl font-bold text-center mb-4">Download-Status</h1>
-
       <div id="spinner" class="spinner"></div>
       <p class="text-center text-lg mb-4" id="message">Lade herunter...</p>
 
-      <div class="text-center mt-4">
-        <a
-          id="bulk-download"
-          href="#"
-          class="px-4 py-2 bg-white bg-opacity-25 text-white rounded-full border border-white hover:bg-opacity-40 transition"
-        >
-          Alle als ZIP herunterladen
-        </a>
-      </div>
+
+
+
+
+<!-- Session Controls -->
+<div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
+
+  <!-- Dropdown -->
+  <div class="relative w-full max-w-xs">
+    <select
+      id="clientIdDropdown"
+      class="w-full appearance-none rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 px-4 py-2 pr-10 text-sm shadow-lg focus:outline-none focus:ring-2 focus:ring-white/30 transition"
+    >
+      <option disabled selected>🔍 Verlauf auswählen…</option>
+    </select>
+    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
+      <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+        <path d="M7 7l3-3 3 3m0 6l-3 3-3-3" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Button: ZIP Download -->
+  <a
+    id="bulk-download"
+    href="#"
+    class="px-4 py-2 bg-white bg-opacity-25 text-white rounded-full border border-white hover:bg-opacity-40 transition text-sm shadow"
+  >
+    ZIP herunterladen
+  </a>
+
+  <!-- Button: Historie löschen -->
+  <button
+    onclick="refreshCookie()"
+    class="px-4 py-2 rounded-full bg-white bg-opacity-20 border border-white hover:bg-opacity-30 transition text-white text-sm shadow"
+  >
+    Historie löschen
+  </button>
+</div>
+<!-- End Session Controls -->
 
       <div id="file-list" class="mt-8 space-y-4"></div>
 
@@ -66,14 +96,7 @@
         >
       </div>
 
-      <div class="mt-4 text-center">
-        <button
-          onclick="refreshCookie()"
-          class="px-6 py-2 rounded-full bg-white bg-opacity-20 border border-white hover:bg-opacity-30 transition text-white font-medium"
-        >
-          Historie Löschen
-        </button>
-      </div>
+  
     </div>
 
   <script>
@@ -82,7 +105,7 @@
   const list = document.getElementById("file-list");
   const zipLink = document.getElementById("bulk-download");
   const spinner = document.getElementById("spinner");
-
+  storeClientIdInHistory(clientId);
   zipLink.href = `/zip/${clientId}`;
 
   let timeoutSeconds = null;
@@ -169,6 +192,63 @@
 
   setInterval(pollStatus, 1000);  // für Countdown präziser jede Sekunde
   pollStatus();
+
+
+function storeClientIdInHistory(clientId) {
+  const key = "clientIdHistory";
+  let history = [];
+
+  try {
+    history = JSON.parse(localStorage.getItem(key)) || [];
+  } catch {
+    history = [];
+  }
+
+  // Neues oben einfügen, Duplikate entfernen
+  history = history.filter(id => id !== clientId);
+  history.unshift(clientId);
+
+  // Maximal 20 Einträge
+  if (history.length > 20) {
+    history = history.slice(0, 20);
+  }
+
+  localStorage.setItem(key, JSON.stringify(history));
+}
+
+function populateClientIdDropdown() {
+  const select = document.getElementById("clientIdDropdown");
+  if (!select) return;
+
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem("clientIdHistory")) || [];
+  } catch {
+    history = [];
+  }
+
+  // Dropdown leeren
+  select.innerHTML = '<option disabled selected>Verlauf auswählen…</option>';
+
+  history.forEach(clientId => {
+    const option = document.createElement("option");
+    option.value = clientId;
+    option.textContent = clientId;
+    select.appendChild(option);
+  });
+
+  select.addEventListener("change", () => {
+    const selected = select.value;
+    if (selected) {
+      window.location.href = `/status_page/${selected}`;
+    }
+  });
+}
+
+// Initialisieren bei Seitenladeende
+document.addEventListener("DOMContentLoaded", () => {
+  populateClientIdDropdown();
+});
 </script>
   </body>
 </html>

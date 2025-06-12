@@ -88,6 +88,16 @@
       </form>
     </div>
     <script>
+      function refreshCookie() {
+      fetch("/refresh_cookie")
+        .then(() => {
+          window.location.href = "/";
+        })
+        .catch((err) => {
+          console.error("Fehler beim Refresh:", err);
+          alert("❌ Cookie konnte nicht aktualisiert werden.");
+        });
+    }
       const input = document.getElementById('query-input');
       const suggestionsBox = document.getElementById('suggestions');
       let controller;
@@ -138,6 +148,7 @@
           suggestionsBox.classList.add('hidden');
         }
       });
+
     </script>
   </body>
 </html>
