@@ -268,7 +268,7 @@ def is_url(s: str) -> bool:
     try:
         p = urlparse(s)
         return p.scheme in ("http", "https")
-    except:
+    except:  # noqa: E722
         return False
 
 
