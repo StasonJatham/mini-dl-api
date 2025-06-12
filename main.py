@@ -2,6 +2,7 @@ import asyncio
 from io import BytesIO
 import os
 import zipfile
+from fastapi.staticfiles import StaticFiles
 import requests
 import uuid
 from pathlib import Path
@@ -48,6 +49,7 @@ class SearchRequest(BaseModel):
 
 # === FastAPI app and templates ===
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
