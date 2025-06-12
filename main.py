@@ -36,6 +36,7 @@ DOWNLOAD_DIR = Path("./downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 DEFAULT_COOKIE_EXPIRATION = 60 * 60  # 1 hour
 SPOTDL_EXEC = "/root/ytloader/mini-dl-api/venv/bin/spotdl"
+YT_EXEC = "/root/ytloader/mini-dl-api/venv/bin/yt-dlp"
 
 # === Local file search index ===
 file_index: List[dict] = []
@@ -214,9 +215,6 @@ async def run_spotdl(query: str, file_id: str):
         "message": "Starte Download...",
         "log": [],
     }
-
-    print(file_id)
-
     client_path = DOWNLOAD_DIR / file_id
     client_path.mkdir(parents=True, exist_ok=True)
 
@@ -448,7 +446,7 @@ async def run_ytdlp(query: str, client_id: str):
     client_path.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "yt-dlp",
+        YT_EXEC,
         "--extract-audio",
         "--audio-format",
         "mp3",
